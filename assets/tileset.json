@@ -1,0 +1,15 @@
+{ "columns":25,
+ "image":"tileset.png",
+ "imageheight":629,
+ "imagewidth":426,
+ "margin":1,
+ "name":"Custom Edited - Mario Customs - Tileset",
+ "spacing":1,
+ "tilecount":925,
+ "tiledversion":"1.11.2",
+ "tileheight":16,
+ "tilewidth":16,
+ "transparentcolor":"#578caa",
+ "type":"tileset",
+ "version":"1.10"
+}
