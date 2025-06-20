@@ -12,12 +12,6 @@ export class Game extends Scene {
   playerStatus = 'idle';
   smoothedControls: SmoothedHorizontalControl;
 
-  // 게임 오브젝트 그룹들
-  groundGroup: Phaser.Physics.Arcade.StaticGroup;
-  coinGroup: Phaser.Physics.Arcade.Group;
-  brickGroup: Phaser.Physics.Arcade.StaticGroup;
-  pipeGroup: Phaser.Physics.Arcade.StaticGroup;
-
   constructor() {
     super('Game');
   }
