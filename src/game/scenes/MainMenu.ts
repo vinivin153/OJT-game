@@ -7,7 +7,12 @@ export class MainMenu extends Scene {
 
   create() {
     /**========== 배경 이미지 ==========*/
-    this.add.image(240, 240, 'menu-bg');
+    const { width, height } = this.cameras.main;
+    const bg = this.add.image(width / 2, height / 2, 'menu-bg');
+    const scaleX = width / bg.width;
+    const scaleY = height / bg.height;
+    const scale = Math.max(scaleX, scaleY);
+    bg.setScale(scale);
 
     /**========== 배너 로고 ========== */
     this.add.rectangle(240, 180, 180, 100, 0xde5819);
@@ -32,27 +37,12 @@ export class MainMenu extends Scene {
     const buttonHeight = 50;
 
     /** 박스 스타일 설정 함수 */
-    const setStartButtonBoxStyle = (
-      graphics: GameObjects.Graphics,
-      alpha: number = 0
-    ) => {
+    const setStartButtonBoxStyle = (graphics: GameObjects.Graphics, alpha: number = 0) => {
       graphics.clear();
       graphics.fillStyle(0xffffff, alpha);
       graphics.lineStyle(4, 0xffffff);
-      graphics.strokeRoundedRect(
-        -buttonWidth / 2,
-        -buttonHeight / 2,
-        buttonWidth,
-        buttonHeight,
-        12
-      );
-      graphics.fillRoundedRect(
-        -buttonWidth / 2,
-        -buttonHeight / 2,
-        buttonWidth,
-        buttonHeight,
-        12
-      );
+      graphics.strokeRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight, 12);
+      graphics.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight, 12);
     };
     setStartButtonBoxStyle(startButtonBox);
 
@@ -68,10 +58,7 @@ export class MainMenu extends Scene {
       .setOrigin(0.5);
 
     // 버튼 컨테이너 생성
-    const startButton = this.add.container(240, 360, [
-      startButtonBox,
-      startButtonText,
-    ]);
+    const startButton = this.add.container(240, 360, [startButtonBox, startButtonText]);
     startButton.setSize(160, 50);
 
     // 버튼 마우스 이벤트 설정
@@ -86,5 +73,8 @@ export class MainMenu extends Scene {
       .on('pointerout', () => {
         setStartButtonBoxStyle(startButtonBox, 0);
       });
+
+    // 임시
+    this.scene.start('Game');
   }
 }
