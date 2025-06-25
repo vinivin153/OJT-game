@@ -153,6 +153,7 @@ export class Game extends Scene {
     }
     this.tileset = tileset;
     this.createGroundObjects();
+    this.createCloudObjects();
   }
 
   /** ground object 생성 */
@@ -162,7 +163,6 @@ export class Game extends Scene {
       console.error('ground 레이어를 생성할 수 없습니다');
       return;
     }
-
     // ground Layer 충돌 설정
     groundLayer.setCollisionByExclusion([-1]);
 
@@ -177,6 +177,24 @@ export class Game extends Scene {
     this.matter.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels, 64, true, true, true, false);
   }
 
+  /** cloud object 생성 */
+  createCloudObjects() {
+    const cloudLayer = this.map.createLayer('cloud', this.tileset, 0, 0);
+    if (!cloudLayer) {
+      console.error('cloud 레이어를 생성할 수 없습니다');
+      return;
+    }
+    // cloud Layer 충돌 설정
+    cloudLayer.setCollisionByExclusion([-1]);
+
+    // Matter.js 물리 바디로 변환
+    this.matter.world.convertTilemapLayer(cloudLayer, {
+      label: 'cloud',
+      friction: 0.001,
+      frictionAir: 0.01,
+    });
+  }
+
   /** 카메라 설정 */
   setupCamera() {
     this.camera = this.cameras.main;
@@ -186,17 +204,42 @@ export class Game extends Scene {
 
   /** 충돌 설정 */
   setupCollisions() {
-    // 충돌 시작 시 바닥 접촉 감지
     this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       event.pairs.forEach((pair) => {
         const bodyA = pair.bodyA;
         const bodyB = pair.bodyB;
 
-        // 바닥 센서와 ground 타일의 충돌 감지
+        // cloud와 player의 충돌 감지
+        if (
+          (bodyA.label === 'cloud' && bodyB.label === 'player') ||
+          (bodyB.label === 'cloud' && bodyA.label === 'player')
+        ) {
+          const cloudBody = bodyA.label === 'cloud' ? bodyA : bodyB;
+          const cloudTileWrapper = cloudBody.gameObject;
+          const cloudTile = (cloudTileWrapper as any)?.tile;
+
+          if (cloudTile.properties.isBeingDestroyed) {
+            return;
+          }
+          cloudTile.properties.isBeingDestroyed = true;
+
+          this.tweens.add({
+            targets: cloudTile,
+            alpha: { value: 0, duration: 500, ease: 'Power1' },
+            onComplete: () => {
+              this.destroyTile(cloudTile);
+            },
+          });
+
+          this.playerController.numTouching.bottom += 1;
+          this.isPlayerOnGround = true;
+        }
+
         if (
           (bodyA.label === 'bottomSensor' && bodyB.label === 'ground') ||
           (bodyB.label === 'bottomSensor' && bodyA.label === 'ground')
         ) {
+          // 바닥 센서와 ground 타일의 충돌 감지
           this.playerController.numTouching.bottom += 1;
           this.isPlayerOnGround = true;
         }
@@ -212,6 +255,8 @@ export class Game extends Scene {
         if (
           (bodyA.label === 'bottomSensor' && bodyB.label === 'ground') ||
           (bodyB.label === 'bottomSensor' && bodyA.label === 'ground') ||
+          (bodyA.label === 'bottomSensor' && bodyB.label === 'cloud') ||
+          (bodyB.label === 'bottomSensor' && bodyA.label === 'cloud') ||
           (bodyA.label === 'bottomSensor' && bodyB.label === 'rectangle') ||
           (bodyB.label === 'bottomSensor' && bodyA.label === 'rectangle')
         ) {
@@ -227,6 +272,14 @@ export class Game extends Scene {
         this.handleGameOver();
       }
     });
+  }
+
+  /** 타일 제거 */
+  destroyTile(tile: Phaser.Tilemaps.Tile) {
+    const layer = tile.tilemapLayer;
+    layer!.removeTileAt(tile.x, tile.y);
+    const physics = tile.physics as { matterBody?: Phaser.Physics.Matter.TileBody };
+    physics.matterBody?.destroy();
   }
 
   /** 플레이어 이동 처리 */
