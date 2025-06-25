@@ -11,6 +11,7 @@ export class Game extends Scene {
   isPlayerOnGround = false;
   playerStatus = 'idle';
   smoothedControls: SmoothedHorizontalControl;
+  walkWaySpeed = 0;
 
   constructor() {
     super('Game');
@@ -154,6 +155,7 @@ export class Game extends Scene {
     this.tileset = tileset;
     this.createGroundObjects();
     this.createCloudObjects();
+    this.createWalkWayObjects();
   }
 
   /** ground object 생성 */
@@ -195,6 +197,34 @@ export class Game extends Scene {
     });
   }
 
+  /** walkway object 생성 */
+  createWalkWayObjects() {
+    const walkWayLeftLayer = this.map.createLayer('walkway_left', this.tileset, 0, 0);
+    const walkWayRightLayer = this.map.createLayer('walkway_right', this.tileset, 0, 0);
+
+    if (!walkWayLeftLayer || !walkWayRightLayer) {
+      console.error('walkway 레이어를 생성할 수 없습니다');
+      return;
+    }
+
+    // walkway Layer 충돌 설정
+    walkWayLeftLayer.setCollisionByExclusion([-1]);
+    walkWayRightLayer.setCollisionByExclusion([-1]);
+
+    // Matter.js 물리 바디로 변환
+    this.matter.world.convertTilemapLayer(walkWayLeftLayer, {
+      label: 'walkway_left',
+      friction: 0.001,
+      frictionAir: 0.01,
+    });
+
+    this.matter.world.convertTilemapLayer(walkWayRightLayer, {
+      label: 'walkway_right',
+      friction: 0.001,
+      frictionAir: 0.01,
+    });
+  }
+
   /** 카메라 설정 */
   setupCamera() {
     this.camera = this.cameras.main;
@@ -204,12 +234,67 @@ export class Game extends Scene {
 
   /** 충돌 설정 */
   setupCollisions() {
-    this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
-      event.pairs.forEach((pair) => {
-        const bodyA = pair.bodyA;
-        const bodyB = pair.bodyB;
+    this.matter.world.on('beforeupdate', () => {
+      this.playerController.numTouching.bottom = 0;
+      this.walkWaySpeed = 0;
+    });
 
-        // cloud와 player의 충돌 감지
+    this.matter.world.on('collisionactive', (event: Phaser.Physics.Matter.Events.CollisionActiveEvent) => {
+      const walkWaySpeed = 1.8;
+
+      for (const pair of event.pairs) {
+        const { bodyA, bodyB } = pair;
+
+        // --- 바닥 감지 및 컨베이어 벨트 로직 통합 ---
+        let groundCandidate: MatterJS.BodyType | undefined;
+
+        // 1. bottomSensor와의 충돌인지 확인하고, 상대방을 groundCandidate로 지정
+        if (bodyA.label === 'bottomSensor') {
+          groundCandidate = bodyB;
+        } else if (bodyB.label === 'bottomSensor') {
+          groundCandidate = bodyA;
+        } else {
+          continue; // bottomSensor와 관련 없는 충돌은 이 로직에서 무시
+        }
+
+        // 2. 상대방이 바닥 역할을 하는 표면인지 확인
+        const isGroundSurface =
+          groundCandidate.label === 'ground' ||
+          groundCandidate.label.startsWith('walkway_') ||
+          groundCandidate.label === 'cloud';
+
+        // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
+        const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
+
+        if (isGroundSurface && isVerticalCollision) {
+          // 4. 바닥에 닿았으므로 카운터를 증가시킴
+          this.playerController.numTouching.bottom += 1;
+
+          // 5. 만약 그 바닥이 컨베이어 벨트라면, 추가로 힘을 적용!
+          if (groundCandidate.label.startsWith('walkway_')) {
+            // 힘을 적용할 대상은 플레이어의 전체 물리 바디인 'this.player.body' 입니다.
+            if (groundCandidate.label === 'walkway_left') {
+              this.walkWaySpeed = -walkWaySpeed;
+            } else if (groundCandidate.label === 'walkway_right') {
+              this.walkWaySpeed = walkWaySpeed;
+            }
+          }
+        }
+      }
+    });
+
+    // 3. 모든 물리 및 이벤트 처리가 끝난 후, 최종 상태를 결정합니다.
+    this.matter.world.on('afterupdate', () => {
+      this.isPlayerOnGround = this.playerController.numTouching.bottom > 0;
+      // 게임 오버 조건
+      if (this.player.y > this.map.heightInPixels + 100) {
+        this.handleGameOver();
+      }
+    });
+
+    this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
+      for (const pair of event.pairs) {
+        const { bodyA, bodyB } = pair;
         if (
           (bodyA.label === 'cloud' && bodyB.label === 'player') ||
           (bodyB.label === 'cloud' && bodyA.label === 'player')
@@ -230,46 +315,7 @@ export class Game extends Scene {
               this.destroyTile(cloudTile);
             },
           });
-
-          this.playerController.numTouching.bottom += 1;
-          this.isPlayerOnGround = true;
         }
-
-        if (
-          (bodyA.label === 'bottomSensor' && bodyB.label === 'ground') ||
-          (bodyB.label === 'bottomSensor' && bodyA.label === 'ground')
-        ) {
-          // 바닥 센서와 ground 타일의 충돌 감지
-          this.playerController.numTouching.bottom += 1;
-          this.isPlayerOnGround = true;
-        }
-      });
-    });
-
-    // 충돌 종료 시 바닥 접촉 해제
-    this.matter.world.on('collisionend', (event: Phaser.Physics.Matter.Events.CollisionEndEvent) => {
-      event.pairs.forEach((pair) => {
-        const bodyA = pair.bodyA;
-        const bodyB = pair.bodyB;
-
-        if (
-          (bodyA.label === 'bottomSensor' && bodyB.label === 'ground') ||
-          (bodyB.label === 'bottomSensor' && bodyA.label === 'ground') ||
-          (bodyA.label === 'bottomSensor' && bodyB.label === 'cloud') ||
-          (bodyB.label === 'bottomSensor' && bodyA.label === 'cloud') ||
-          (bodyA.label === 'bottomSensor' && bodyB.label === 'rectangle') ||
-          (bodyB.label === 'bottomSensor' && bodyA.label === 'rectangle')
-        ) {
-          this.playerController.numTouching.bottom -= 1;
-          this.isPlayerOnGround = this.playerController.numTouching.bottom > 0;
-        }
-      });
-    });
-
-    // 게임 오버 조건 (맵 밖으로 떨어짐)
-    this.matter.world.on('afterupdate', () => {
-      if (this.player.y > this.map.heightInPixels + 100) {
-        this.handleGameOver();
       }
     });
   }
@@ -284,78 +330,81 @@ export class Game extends Scene {
 
   /** 플레이어 이동 처리 */
   handlePlayerMovement() {
-    const cursors = this.input.keyboard!.createCursorKeys();
-
-    let oldVelocityX;
-    let targetVelocityX;
-    let newVelocityX;
-
-    if (!this.player.body) {
-      console.error('플레이어가 존재하지 않습니다');
+    if (!this.player || !this.player.body) {
       return;
     }
 
-    // 수평 이동
-    if (cursors.left.isDown) {
-      this.smoothedControls.moveLeft(this.game.loop.delta, this.playerController);
-      this.player.anims.play('move-left', true);
+    // smoothedControls 업데이트를 위해 delta 값을 가져옵니다.
+    const delta = this.game.loop.delta;
+    const cursors = this.input.keyboard!.createCursorKeys();
 
-      oldVelocityX = this.player.body.velocity.x;
-      targetVelocityX = -this.playerController.speed.run;
-      newVelocityX = Phaser.Math.Linear(oldVelocityX, targetVelocityX, -this.smoothedControls.value);
+    const isMovingLeft = cursors.left.isDown;
+    const isMovingRight = cursors.right.isDown;
 
-      this.player.setVelocityX(newVelocityX);
-      this.playerStatus = 'left';
-    } else if (cursors.right.isDown) {
-      this.smoothedControls.moveRight(this.game.loop.delta, this.playerController);
-      this.player.anims.play('move-right', true);
-
-      oldVelocityX = this.player.body.velocity.x;
-      targetVelocityX = this.playerController.speed.run;
-      newVelocityX = Phaser.Math.Linear(oldVelocityX, targetVelocityX, this.smoothedControls.value);
-
-      this.player.setVelocityX(newVelocityX);
-      this.playerStatus = 'right';
+    // 1. 키 입력에 따라 smoothedControls의 내부 값(value)을 업데이트합니다.
+    //    이 value가 0에서 1(또는 -1)로 점진적으로 변하며 '엑셀' 역할을 합니다.
+    if (isMovingLeft) {
+      this.smoothedControls.moveLeft(delta, this.playerController);
+    } else if (isMovingRight) {
+      this.smoothedControls.moveRight(delta, this.playerController);
     } else {
       this.smoothedControls.reset();
-      // 정지 애니메이션
-      if (this.playerStatus === 'left') {
-        this.player.anims.play('idle-left', true);
-      } else {
-        this.player.anims.play('idle-right', true);
-      }
     }
 
-    // 점프 (바닥에 있을 때만)
-    const canJump = this.time.now - this.playerController.lastJumpedAt > 250;
-    if (cursors.space.isDown && this.isPlayerOnGround) {
-      this.player.anims.play('idle-right', true);
-      if (canJump) {
-        // 점프 딜레이
-        this.player.setVelocityY(-this.playerController.speed.jump);
-        this.playerController.lastJumpedAt = this.time.now;
-      }
+    // 2. 목표 속도(targetVelocityX)를 계산합니다.
+    //    이것은 도달할 수 있는 '최대 속도'를 의미합니다.
+    let targetVelocityX = this.walkWaySpeed; // 기본 속도는 컨베이어 속도
+    if (isMovingLeft) {
+      targetVelocityX -= this.playerController.speed.run;
+    } else if (isMovingRight) {
+      targetVelocityX += this.playerController.speed.run;
     }
-    // 공중에 있는 경우 점프 애니메이션
-    else if (!this.isPlayerOnGround) {
+
+    // 3. 현재 속도에서 목표 속도로 'smoothedControls.value' 만큼 보간하여 최종 속도를 결정합니다.
+    const currentVelocityX = this.player.body.velocity.x;
+    let newVelocityX;
+
+    if (isMovingLeft || isMovingRight) {
+      // 키를 누르고 있을 때: '가속' 효과 적용
+      // smoothedControls.value가 0 -> 1로 변하면서 newVelocityX가 점진적으로 targetVelocityX에 가까워집니다.
+      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, Math.abs(this.smoothedControls.value));
+    } else {
+      // 키를 누르지 않았을 때: 부드럽게 감속하거나 컨베이어 속도에 맞춰짐
+      // 고정된 lerpFactor를 사용하여 현재 속도를 컨베이어 속도(targetVelocityX)로 점차 변경합니다.
+      const lerpFactor = 0.1;
+      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, lerpFactor);
+    }
+
+    this.player.setVelocityX(newVelocityX);
+
+    // 4. 애니메이션 처리
+    if (!this.isPlayerOnGround) {
       if (this.playerStatus === 'left') {
         this.player.anims.play('jump-left', true);
       } else {
         this.player.anims.play('jump-right', true);
       }
+    } else {
+      if (isMovingLeft) {
+        this.player.anims.play('move-left', true);
+        this.playerStatus = 'left';
+      } else if (isMovingRight) {
+        this.player.anims.play('move-right', true);
+        this.playerStatus = 'right';
+      } else {
+        if (this.playerStatus === 'left') {
+          this.player.anims.play('idle-left', true);
+        } else {
+          this.player.anims.play('idle-right', true);
+        }
+      }
     }
 
-    // 디버깅용 - 플레이어 상태 출력
-    if (this.time.now % 1000 < 16) {
-      // 대략 1초마다
-      console.log(
-        'Player Y:',
-        this.player.y,
-        'On Ground:',
-        this.isPlayerOnGround,
-        'Touching Bottom:',
-        this.playerController.numTouching.bottom
-      );
+    // 5. 점프 로직
+    const canJump = this.time.now - this.playerController.lastJumpedAt > 250;
+    if (cursors.space.isDown && this.isPlayerOnGround && canJump) {
+      this.player.setVelocityY(-this.playerController.speed.jump);
+      this.playerController.lastJumpedAt = this.time.now;
     }
   }
 
