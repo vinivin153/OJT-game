@@ -14,7 +14,12 @@ export class Preloader extends Scene {
     this.load.image('world-bg', 'world_bg.png');
 
     this.load.tilemapTiledJSON('world', 'world.json');
-    this.load.image('tileset', 'tileset.png');
+    this.load.spritesheet('tileset', 'tileset.png', {
+      frameWidth: 16,
+      frameHeight: 16,
+      spacing: 1,
+      margin: 1,
+    });
 
     this.load.spritesheet('player', 'horse.png', {
       frameWidth: 80,
