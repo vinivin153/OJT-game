@@ -20,6 +20,10 @@ export class Preloader extends Scene {
       spacing: 1,
       margin: 1,
     });
+    this.load.spritesheet('tileset2', 'tileset2.png', {
+      frameWidth: 24,
+      frameHeight: 24,
+    });
 
     this.load.spritesheet('player', 'horse.png', {
       frameWidth: 80,
