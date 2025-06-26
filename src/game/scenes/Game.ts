@@ -191,6 +191,7 @@ export class Game extends Scene {
       label: 'ground',
       friction: 0.001,
       frictionAir: 0.01,
+      static: true,
     });
 
     // 월드 경계 설정
@@ -345,6 +346,9 @@ export class Game extends Scene {
   setupCollisions() {
     this.matter.world.on('beforeupdate', () => {
       this.playerController.numTouching.bottom = 0;
+      this.playerController.numTouching.left = 0;
+      this.playerController.numTouching.right = 0;
+      this.playerController.numTouching.right = 0;
       this.walkWaySpeed = 0;
     });
 
@@ -353,6 +357,19 @@ export class Game extends Scene {
 
       for (const pair of event.pairs) {
         const { bodyA, bodyB } = pair;
+
+        const isStaticBody = (body: MatterJS.BodyType) => !body.isSensor && body.isStatic;
+        if (bodyA.label === 'leftSensor' && isStaticBody(bodyB)) {
+          this.playerController.numTouching.left += 1;
+        } else if (bodyB.label === 'leftSensor' && isStaticBody(bodyA)) {
+          this.playerController.numTouching.left += 1;
+        }
+
+        if (bodyA.label === 'rightSensor' && isStaticBody(bodyB)) {
+          this.playerController.numTouching.right += 1;
+        } else if (bodyB.label === 'rightSensor' && isStaticBody(bodyA)) {
+          this.playerController.numTouching.right += 1;
+        }
 
         // --- 바닥 감지 및 컨베이어 벨트 로직 통합 ---
         let groundCandidate: MatterJS.BodyType | undefined;
@@ -493,6 +510,12 @@ export class Game extends Scene {
     }
 
     if (!this.player || !this.player.body) {
+      return;
+    }
+
+    const isTouchingWall = this.playerController.numTouching.left > 0 || this.playerController.numTouching.right > 0;
+
+    if (!this.isPlayerOnGround && isTouchingWall) {
       return;
     }
 
