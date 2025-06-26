@@ -160,6 +160,7 @@ export class Game extends Scene {
     this.createCloudObjects();
     this.createWalkWayObjects();
     this.createTrapObjects();
+    this.createEnimies();
   }
 
   /** ground object 생성 */
@@ -268,6 +269,52 @@ export class Game extends Scene {
           repeat: -1,
         });
       }
+    });
+  }
+
+  /** enimies object 생성 */
+  createEnimies() {
+    const enemyLayer = this.map.getObjectLayer('enimies');
+
+    if (!enemyLayer) {
+      console.error('enimies 오브젝트 레이어를 찾을 수 없습니다.');
+      return;
+    }
+
+    this.anims.create({
+      key: 'enemy-walk',
+      frames: this.anims.generateFrameNumbers('tileset2', { start: 0, end: 3 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    enemyLayer.objects.forEach((enemyObject) => {
+      const patrolRange = 100;
+      const speed = 1;
+
+      const frameIndex = enemyObject.gid! - this.tileset.firstgid;
+      const enemySprite = this.matter.add
+        .sprite(enemyObject.x!, enemyObject.y!, 'tileset2', frameIndex, {
+          label: 'enemy',
+          isStatic: false,
+          friction: 0.001,
+          restitution: 0.1,
+        })
+        .setBody({
+          type: 'rectangle',
+          width: 24,
+          height: 20,
+        })
+        .setOrigin(0.5, 0.4)
+        .setFixedRotation();
+
+      enemySprite.setData('patrolOriginX', enemyObject.x!);
+      enemySprite.setData('patrolRange', patrolRange);
+      enemySprite.setData('speed', speed);
+      enemySprite.setData('direction', -1);
+
+      enemySprite.setVelocityX(-speed);
+      enemySprite.anims.play('enemy-walk', true);
     });
   }
 
