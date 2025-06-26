@@ -447,22 +447,26 @@ export class Game extends Scene {
     });
 
     this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
+      function hasLabel(
+        pair: Phaser.Types.Physics.Matter.MatterCollisionPair,
+        labelA: string,
+        labelB: string
+      ): boolean {
+        const bodyA = pair.bodyA;
+        const bodyB = pair.bodyB;
+
+        return (bodyA.label === labelA && bodyB.label === labelB) || (bodyB.label === labelA && bodyA.label === labelB);
+      }
+
       for (const pair of event.pairs) {
         const { bodyA, bodyB } = pair;
 
-        console.log('Collision Start:', bodyA.label, bodyB.label);
-        if (
-          (bodyA.label === 'player' && bodyB.label === 'fake') ||
-          (bodyA.label === 'fake' && bodyB.label === 'player')
-        ) {
+        if (hasLabel(pair, 'player', 'fake')) {
           this.showMessage('욕심쟁이!');
         }
 
         // 플레이어가 구름을 밟았을 때
-        if (
-          (bodyA.label === 'cloud' && bodyB.label === 'player') ||
-          (bodyB.label === 'cloud' && bodyA.label === 'player')
-        ) {
+        if (hasLabel(pair, 'cloud', 'player')) {
           const cloudBody = bodyA.label === 'cloud' ? bodyA : bodyB;
           const cloudTileWrapper = cloudBody.gameObject;
           const cloudTile = (cloudTileWrapper as any)?.tile;
@@ -482,27 +486,16 @@ export class Game extends Scene {
         }
 
         // 플레이어가 트랩에 닿았을 때
-        if (
-          (bodyA.label === 'trap' && bodyB.label === 'player') ||
-          (bodyB.label === 'trap' && bodyA.label === 'player')
-        ) {
+        if (hasLabel(pair, 'trap', 'player')) {
           this.handleGameOver();
         }
 
         // 플레이어가 적과 충돌했을 때
-        if (
-          (bodyA.label === 'enemy' && bodyB.label === 'leftSensor') ||
-          (bodyB.label === 'enemy' && bodyA.label === 'leftSensor') ||
-          (bodyA.label === 'enemy' && bodyB.label === 'rightSensor') ||
-          (bodyB.label === 'enemy' && bodyA.label === 'rightSensor')
-        ) {
+        if (hasLabel(pair, 'enemy', 'leftSensor') || hasLabel(pair, 'enemy', 'rightSensor')) {
           this.handleGameOver();
         }
         // 플레이어가 적을 밟았을 때
-        else if (
-          (bodyA.label === 'enemy' && bodyB.label === 'bottomSensor') ||
-          (bodyB.label === 'enemy' && bodyA.label === 'bottomSensor')
-        ) {
+        else if (hasLabel(pair, 'enemy', 'bottomSensor')) {
           const enemyBody = bodyA.label === 'enemy' ? bodyA : bodyB;
           const enemyGameObject = enemyBody.gameObject as Phaser.Physics.Matter.Sprite;
           {
