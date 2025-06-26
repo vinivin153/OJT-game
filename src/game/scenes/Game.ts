@@ -5,6 +5,7 @@ export class Game extends Scene {
   camera: Phaser.Cameras.Scene2D.Camera;
   background: Phaser.GameObjects.Image;
   player: Phaser.Physics.Matter.Sprite;
+  enemy: Phaser.Physics.Matter.Sprite | null;
   map: Phaser.Tilemaps.Tilemap;
   tileset: Phaser.Tilemaps.Tileset;
   playerController: playerControllerType;
@@ -94,14 +95,26 @@ export class Game extends Scene {
     });
 
     // 바닥 감지 센서 - 위치와 크기 조정
-    const bottomSensor = M.Bodies.rectangle(sx, sy + h / 2 + 2, w * 0.5, 6, {
+    const bottomSensor = M.Bodies.rectangle(sx, sy + h / 2 + 2, w * 0.4, 6, {
       isSensor: true,
       label: 'bottomSensor',
     });
 
+    // 왼쪽 센서 - 위치와 크기 조정
+    const leftSensor = M.Bodies.rectangle(sx - w / 2 + 8, sy, 6, h * 0.5, {
+      isSensor: true,
+      label: 'leftSensor',
+    });
+
+    // 오른쪽 센서 - 위치와 크기 조정
+    const rightSensor = M.Bodies.rectangle(sx + w / 2 - 8, sy, 6, h * 0.5, {
+      isSensor: true,
+      label: 'rightSensor',
+    });
+
     // 복합 바디 생성
     const compoundBody = M.Body.create({
-      parts: [playerBody, bottomSensor],
+      parts: [playerBody, bottomSensor, leftSensor, rightSensor],
       restitution: 0.05,
     });
 
@@ -127,8 +140,8 @@ export class Game extends Scene {
       },
       sensors: {
         bottom: bottomSensor,
-        left: null,
-        right: null,
+        left: leftSensor,
+        right: rightSensor,
       },
       time: {
         leftDown: 0,
@@ -289,21 +302,22 @@ export class Game extends Scene {
     });
 
     enemyLayer.objects.forEach((enemyObject) => {
-      const patrolRange = 100;
+      const patrolRange = 50;
       const speed = 1;
 
       const frameIndex = enemyObject.gid! - this.tileset.firstgid;
       const enemySprite = this.matter.add
-        .sprite(enemyObject.x!, enemyObject.y!, 'tileset2', frameIndex, {
+        .sprite(enemyObject.x!, enemyObject.y!, 'tileset', frameIndex, {
           label: 'enemy',
           isStatic: false,
           friction: 0.001,
           restitution: 0.1,
-        })
-        .setBody({
-          type: 'rectangle',
-          width: 24,
-          height: 20,
+
+          shape: {
+            type: 'rectangle',
+            width: 24,
+            height: 20,
+          },
         })
         .setOrigin(0.5, 0.4)
         .setFixedRotation();
@@ -315,6 +329,8 @@ export class Game extends Scene {
 
       enemySprite.setVelocityX(-speed);
       enemySprite.anims.play('enemy-walk', true);
+
+      this.enemy = enemySprite;
     });
   }
 
@@ -388,6 +404,8 @@ export class Game extends Scene {
     this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) {
         const { bodyA, bodyB } = pair;
+
+        console.log('Collision Start:', bodyA.label, bodyB.label);
         // 플레이어가 구름을 밟았을 때
         if (
           (bodyA.label === 'cloud' && bodyB.label === 'player') ||
@@ -417,6 +435,43 @@ export class Game extends Scene {
           (bodyB.label === 'trap' && bodyA.label === 'player')
         ) {
           this.handleGameOver();
+        }
+
+        // 플레이어가 적과 충돌했을 때
+        if (
+          (bodyA.label === 'enemy' && bodyB.label === 'leftSensor') ||
+          (bodyB.label === 'enemy' && bodyA.label === 'leftSensor') ||
+          (bodyA.label === 'enemy' && bodyB.label === 'rightSensor') ||
+          (bodyB.label === 'enemy' && bodyA.label === 'rightSensor')
+        ) {
+          this.handleGameOver();
+        }
+        // 플레이어가 적을 밟았을 때
+        else if (
+          (bodyA.label === 'enemy' && bodyB.label === 'bottomSensor') ||
+          (bodyB.label === 'enemy' && bodyA.label === 'bottomSensor')
+        ) {
+          const enemyBody = bodyA.label === 'enemy' ? bodyA : bodyB;
+          const enemyGameObject = enemyBody.gameObject as Phaser.Physics.Matter.Sprite;
+          {
+            if (enemyBody && pair.collision.normal.y > 0.5) {
+              this.player.setVelocityY(-this.playerController.speed.jump * 0.6);
+              enemyGameObject.setStatic(true);
+              enemyGameObject.setSensor(true);
+              enemyGameObject.anims.stop();
+              enemyGameObject.setFrame(4);
+              this.enemy = null;
+
+              this.tweens.add({
+                targets: enemyGameObject,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                  enemyGameObject.destroy();
+                },
+              });
+            }
+          }
         }
       }
     });
@@ -515,6 +570,25 @@ export class Game extends Scene {
     }
   }
 
+  /** 적 이동 처리 */
+  handleEnemyMovement() {
+    if (!this.enemy) return;
+
+    this.enemy.setVelocityX(this.enemy.getData('direction') * this.enemy.getData('speed'));
+    const patrolOriginX = this.enemy.getData('patrolOriginX');
+    const patrolRange = this.enemy.getData('patrolRange');
+    const speed = this.enemy.getData('speed');
+    const currentX = this.enemy.x;
+
+    // 적이 지정된 범위를 벗어나면 방향을 반대로 바꿈
+    if (currentX < Math.floor(patrolOriginX - patrolRange) || currentX > Math.floor(patrolOriginX + patrolRange)) {
+      const newDirection = this.enemy.getData('direction') * -1;
+      this.enemy.setData('direction', newDirection);
+      this.enemy.setFlipX(newDirection === 1);
+      this.enemy.setVelocityX(newDirection * speed);
+    }
+  }
+
   /** 게임 오버 처리 */
   handleGameOver() {
     if (this.isGameOver) return;
@@ -537,6 +611,7 @@ export class Game extends Scene {
 
   update() {
     this.handlePlayerMovement();
+    this.handleEnemyMovement();
   }
 }
 
