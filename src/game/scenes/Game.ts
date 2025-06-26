@@ -12,6 +12,7 @@ export class Game extends Scene {
   playerStatus = 'idle';
   smoothedControls: SmoothedHorizontalControl;
   walkWaySpeed = 0;
+  isGameOver = false;
 
   constructor() {
     super('Game');
@@ -33,6 +34,8 @@ export class Game extends Scene {
 
   /** 캐릭터 생성 */
   createPlayer() {
+    this.isGameOver = false;
+
     // 애니메이션 생성
     this.anims.create({
       key: 'move-right',
@@ -156,6 +159,7 @@ export class Game extends Scene {
     this.createGroundObjects();
     this.createCloudObjects();
     this.createWalkWayObjects();
+    this.createTrapObjects();
   }
 
   /** ground object 생성 */
@@ -222,6 +226,48 @@ export class Game extends Scene {
       label: 'walkway_right',
       friction: 0.001,
       frictionAir: 0.01,
+    });
+  }
+
+  /** trap object 생성 */
+  createTrapObjects() {
+    const trapLayer = this.map.getObjectLayer('trap');
+
+    if (!trapLayer) {
+      console.error('trap 오브젝트 레이어를 찾을 수 없습니다.');
+      return;
+    }
+
+    const getTiledProperty = (obj: Phaser.Types.Tilemaps.TiledObject, name: string) => {
+      const prop = obj.properties?.find((p: { name: string }) => p.name === name);
+      return prop ? prop.value : null;
+    };
+
+    // 레이어의 모든 오브젝트를 순회합니다.
+    trapLayer.objects.forEach((trapObject) => {
+      if (!trapObject.gid) return;
+
+      const frameIndex = trapObject.gid - this.tileset.firstgid;
+      const trapImage = this.matter.add.sprite(trapObject.x!, trapObject.y!, 'tileset', frameIndex, {
+        label: 'trap',
+        isStatic: true,
+      });
+
+      const riseHeight = getTiledProperty(trapObject, 'riseHeight') || 64;
+      const riseTime = getTiledProperty(trapObject, 'riseTime') || 1000;
+      const triggerType = getTiledProperty(trapObject, 'triggerType') || 'always';
+
+      if (triggerType === 'always') {
+        this.tweens.add({
+          targets: trapImage,
+          y: trapImage.y - riseHeight,
+          duration: riseTime,
+          ease: 'Sine.easeInOut',
+          // yoyo: true -> 애니메이션이 끝나면 원래 상태로 되돌아옵니다. (상승 -> 하강)
+          yoyo: true,
+          repeat: -1,
+        });
+      }
     });
   }
 
@@ -295,6 +341,7 @@ export class Game extends Scene {
     this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) {
         const { bodyA, bodyB } = pair;
+        // 플레이어가 구름을 밟았을 때
         if (
           (bodyA.label === 'cloud' && bodyB.label === 'player') ||
           (bodyB.label === 'cloud' && bodyA.label === 'player')
@@ -316,6 +363,14 @@ export class Game extends Scene {
             },
           });
         }
+
+        // 플레이어가 트랩에 닿았을 때
+        if (
+          (bodyA.label === 'trap' && bodyB.label === 'player') ||
+          (bodyB.label === 'trap' && bodyA.label === 'player')
+        ) {
+          this.handleGameOver();
+        }
       }
     });
   }
@@ -330,6 +385,11 @@ export class Game extends Scene {
 
   /** 플레이어 이동 처리 */
   handlePlayerMovement() {
+    if (this.isGameOver) {
+      this.player.setVelocity(0, 0);
+      return;
+    }
+
     if (!this.player || !this.player.body) {
       return;
     }
@@ -410,7 +470,10 @@ export class Game extends Scene {
 
   /** 게임 오버 처리 */
   handleGameOver() {
-    console.log('Game Over!');
+    if (this.isGameOver) return;
+
+    this.isGameOver = true;
+
     // 게임 오버 로직 추가 (씬 재시작, 메뉴로 이동 등)
     this.camera.fade(1000, 0, 0, 0);
     this.camera.shake(500, 0.005);
