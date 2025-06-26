@@ -170,6 +170,7 @@ export class Game extends Scene {
     }
     this.tileset = tileset;
     this.createGroundObjects();
+    this.createFakeLayer();
     this.createCloudObjects();
     this.createWalkWayObjects();
     this.createTrapObjects();
@@ -335,6 +336,34 @@ export class Game extends Scene {
     });
   }
 
+  /** fake layer 생성 */
+  createFakeLayer() {
+    const fakeLayer = this.map.createLayer('fake', this.tileset, 0, 0);
+
+    if (!fakeLayer) {
+      console.error('fake 레이어를 생성할 수 없습니다');
+      return;
+    }
+
+    // 각 fake 타일에 대해 센서 바디 수동 생성
+    for (let y = 0; y < fakeLayer.layer.height; y++) {
+      for (let x = 0; x < fakeLayer.layer.width; x++) {
+        const tile = fakeLayer.getTileAt(x, y);
+        if (tile && tile.index !== -1) {
+          const worldX = tile.getCenterX();
+          const worldY = tile.getCenterY();
+
+          // 센서 바디 생성 (물리적 충돌 없음, 감지만)
+          this.matter.add.rectangle(worldX, worldY, 24, 24, {
+            isStatic: true,
+            isSensor: true,
+            label: 'fake',
+          });
+        }
+      }
+    }
+  }
+
   /** 카메라 설정 */
   setupCamera() {
     this.camera = this.cameras.main;
@@ -347,7 +376,6 @@ export class Game extends Scene {
     this.matter.world.on('beforeupdate', () => {
       this.playerController.numTouching.bottom = 0;
       this.playerController.numTouching.left = 0;
-      this.playerController.numTouching.right = 0;
       this.playerController.numTouching.right = 0;
       this.walkWaySpeed = 0;
     });
@@ -423,6 +451,13 @@ export class Game extends Scene {
         const { bodyA, bodyB } = pair;
 
         console.log('Collision Start:', bodyA.label, bodyB.label);
+        if (
+          (bodyA.label === 'player' && bodyB.label === 'fake') ||
+          (bodyA.label === 'fake' && bodyB.label === 'player')
+        ) {
+          this.showMessage('욕심쟁이!');
+        }
+
         // 플레이어가 구름을 밟았을 때
         if (
           (bodyA.label === 'cloud' && bodyB.label === 'player') ||
@@ -629,6 +664,29 @@ export class Game extends Scene {
         this.scene.stop();
         this.scene.restart();
       },
+    });
+  }
+
+  /** 메시지 표시 */
+  showMessage(message: string) {
+    console.log(message);
+    const style = {
+      fontFamily: 'Arial Black',
+      fontSize: '24px',
+      color: '#fbe3b3',
+      stroke: '#000000',
+      strokeThickness: 4,
+      align: 'center',
+    };
+
+    const text = this.add
+      .text(this.camera.centerX, this.camera.centerY - 100, message, style)
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    text.setShadow(2, 4, '#000000', 0, true, true);
+
+    this.time.delayedCall(2000, () => {
+      text.destroy();
     });
   }
 
