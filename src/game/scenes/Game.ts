@@ -123,7 +123,8 @@ export class Game extends Scene {
     this.player.setDisplaySize(64, 48);
     this.player.setExistingBody(compoundBody);
     this.player.setFixedRotation();
-    this.player.setPosition(100, 400);
+    // this.player.setPosition(100, 800);
+    this.player.setPosition(2000, 400);
 
     // 플레이어 컨트롤러 초기화
     this.playerController = {
@@ -175,6 +176,7 @@ export class Game extends Scene {
     this.createWalkWayObjects();
     this.createTrapObjects();
     this.createEnimies();
+    this.createLiftObjects();
   }
 
   /** ground object 생성 */
@@ -269,7 +271,7 @@ export class Game extends Scene {
         isStatic: true,
       });
 
-      const riseHeight = getTiledProperty(trapObject, 'riseHeight') || 64;
+      const riseHeight = getTiledProperty(trapObject, 'riseHeight') || 48;
       const riseTime = getTiledProperty(trapObject, 'riseTime') || 1000;
       const triggerType = getTiledProperty(trapObject, 'triggerType') || 'always';
 
@@ -333,6 +335,38 @@ export class Game extends Scene {
       enemySprite.anims.play('enemy-walk', true);
 
       this.enemy = enemySprite;
+    });
+  }
+
+  /** lift object 설정 */
+  createLiftObjects() {
+    const liftLayer = this.map.getObjectLayer('lift');
+
+    if (!liftLayer) {
+      console.error('lift 오브젝트 레이어를 찾을 수 없습니다.');
+      return;
+    }
+
+    liftLayer.objects.forEach((liftObject) => {
+      if (!liftObject.gid) return;
+
+      const frameIndex = liftObject.gid - this.tileset.firstgid;
+      const liftImage = this.matter.add.sprite(liftObject.x!, liftObject.y!, 'tileset', frameIndex, {
+        label: 'lift',
+        isStatic: true,
+      });
+
+      const riseHeight = 176;
+      const riseTime = 1500;
+      // 리프트 애니메이션 설정
+      this.tweens.add({
+        targets: liftImage,
+        y: liftImage.y - riseHeight,
+        duration: riseTime,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: -1,
+      });
     });
   }
 
@@ -415,7 +449,8 @@ export class Game extends Scene {
         const isGroundSurface =
           groundCandidate.label === 'ground' ||
           groundCandidate.label.startsWith('walkway_') ||
-          groundCandidate.label === 'cloud';
+          groundCandidate.label === 'cloud' ||
+          groundCandidate.label === 'lift';
 
         // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
         const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
