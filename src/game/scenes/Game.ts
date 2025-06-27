@@ -171,6 +171,7 @@ export class Game extends Scene {
     }
     this.tileset = tileset;
     this.createGroundObjects();
+    this.createIceGroundObjects();
     this.createFakeLayer();
     this.createCloudObjects();
     this.createWalkWayObjects();
@@ -199,6 +200,26 @@ export class Game extends Scene {
 
     // 월드 경계 설정
     this.matter.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels, 64, true, true, true, false);
+  }
+
+  /** ice ground object 생성 */
+  createIceGroundObjects() {
+    const iceGroundLayer = this.map.createLayer('ice_ground', this.tileset, 0, 0);
+
+    if (!iceGroundLayer) {
+      console.error('ice_ground 레이어를 생성할 수 없습니다');
+      return;
+    }
+
+    // ice_ground Layer 충돌 설정
+    iceGroundLayer.setCollisionByExclusion([-1]);
+
+    // Matter.js 물리 바디로 변환
+    this.matter.world.convertTilemapLayer(iceGroundLayer, {
+      label: 'iceGround',
+      friction: 0,
+      static: true,
+    });
   }
 
   /** cloud object 생성 */
@@ -448,6 +469,7 @@ export class Game extends Scene {
         // 2. 상대방이 바닥 역할을 하는 표면인지 확인
         const isGroundSurface =
           groundCandidate.label === 'ground' ||
+          groundCandidate.label === 'iceGround' ||
           groundCandidate.label.startsWith('walkway_') ||
           groundCandidate.label === 'cloud' ||
           groundCandidate.label === 'lift';
