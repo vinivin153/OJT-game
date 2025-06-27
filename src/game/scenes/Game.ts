@@ -10,6 +10,7 @@ export class Game extends Scene {
   tileset: Phaser.Tilemaps.Tileset;
   playerController: playerControllerType;
   isPlayerOnGround = false;
+  isPlayerOnIce = false;
   playerStatus = 'idle';
   smoothedControls: SmoothedHorizontalControl;
   walkWaySpeed = 0;
@@ -116,6 +117,8 @@ export class Game extends Scene {
     const compoundBody = M.Body.create({
       parts: [playerBody, bottomSensor, leftSensor, rightSensor],
       restitution: 0.05,
+      friction: 0,
+      frictionAir: 0,
     });
 
     // 플레이어 스프라이트 생성
@@ -193,8 +196,8 @@ export class Game extends Scene {
     // Matter.js 물리 바디로 변환
     this.matter.world.convertTilemapLayer(groundLayer, {
       label: 'ground',
-      friction: 0.001,
-      frictionAir: 0.01,
+      friction: 0.01,
+      frictionAir: 0.001,
       static: true,
     });
 
@@ -218,6 +221,7 @@ export class Game extends Scene {
     this.matter.world.convertTilemapLayer(iceGroundLayer, {
       label: 'iceGround',
       friction: 0,
+      frictionAir: 0,
       static: true,
     });
   }
@@ -258,13 +262,13 @@ export class Game extends Scene {
     this.matter.world.convertTilemapLayer(walkWayLeftLayer, {
       label: 'walkway_left',
       friction: 0.001,
-      frictionAir: 0.01,
+      frictionAir: 0.001,
     });
 
     this.matter.world.convertTilemapLayer(walkWayRightLayer, {
       label: 'walkway_right',
       friction: 0.001,
-      frictionAir: 0.01,
+      frictionAir: 0.001,
     });
   }
 
@@ -433,6 +437,7 @@ export class Game extends Scene {
       this.playerController.numTouching.left = 0;
       this.playerController.numTouching.right = 0;
       this.walkWaySpeed = 0;
+      this.isPlayerOnIce = false;
     });
 
     this.matter.world.on('collisionactive', (event: Phaser.Physics.Matter.Events.CollisionActiveEvent) => {
@@ -481,6 +486,11 @@ export class Game extends Scene {
           // 4. 바닥에 닿았으므로 카운터를 증가시킴
           this.playerController.numTouching.bottom += 1;
 
+          // 바닥이 얼음이라면, isPlayerOnIce 플래그를 true로 설정
+          if (groundCandidate.label === 'iceGround') {
+            this.isPlayerOnIce = true;
+          }
+
           // 5. 만약 그 바닥이 컨베이어 벨트라면, 추가로 힘을 적용!
           if (groundCandidate.label.startsWith('walkway_')) {
             // 힘을 적용할 대상은 플레이어의 전체 물리 바디인 'this.player.body' 입니다.
@@ -497,6 +507,7 @@ export class Game extends Scene {
     // 3. 모든 물리 및 이벤트 처리가 끝난 후, 최종 상태를 결정합니다.
     this.matter.world.on('afterupdate', () => {
       this.isPlayerOnGround = this.playerController.numTouching.bottom > 0;
+
       // 게임 오버 조건
       if (this.player.y > this.map.heightInPixels + 100) {
         this.handleGameOver();
@@ -520,6 +531,11 @@ export class Game extends Scene {
 
         if (hasLabel(pair, 'player', 'fake')) {
           this.showMessage('욕심쟁이!');
+        }
+
+        if (hasLabel(pair, 'player', 'iceGround')) {
+          console.log('플레이어가 얼음 위에 있습니다');
+          this.isPlayerOnIce = true;
         }
 
         // 플레이어가 구름을 밟았을 때
@@ -589,71 +605,57 @@ export class Game extends Scene {
 
   /** 플레이어 이동 처리 */
   handlePlayerMovement() {
-    if (this.isGameOver) {
+    if (this.isGameOver || !this.player || !this.player.body) {
       this.player.setVelocity(0, 0);
       return;
     }
 
-    if (!this.player || !this.player.body) {
-      return;
-    }
-
-    const isTouchingWall = this.playerController.numTouching.left > 0 || this.playerController.numTouching.right > 0;
-
-    if (!this.isPlayerOnGround && isTouchingWall) {
-      return;
-    }
-
-    // smoothedControls 업데이트를 위해 delta 값을 가져옵니다.
-    const delta = this.game.loop.delta;
     const cursors = this.input.keyboard!.createCursorKeys();
-
     const isMovingLeft = cursors.left.isDown;
     const isMovingRight = cursors.right.isDown;
+    const delta = this.game.loop.delta;
 
-    // 1. 키 입력에 따라 smoothedControls의 내부 값(value)을 업데이트합니다.
-    //    이 value가 0에서 1(또는 -1)로 점진적으로 변하며 '엑셀' 역할을 합니다.
+    // 가속 처리
     if (isMovingLeft) {
       this.smoothedControls.moveLeft(delta, this.playerController);
     } else if (isMovingRight) {
       this.smoothedControls.moveRight(delta, this.playerController);
     } else {
-      this.smoothedControls.reset();
+      // 얼음 위가 아닐 때만 가속값을 리셋
+      if (!this.isPlayerOnIce) {
+        this.smoothedControls.reset();
+      }
     }
 
-    // 2. 목표 속도(targetVelocityX)를 계산합니다.
-    //    이것은 도달할 수 있는 '최대 속도'를 의미합니다.
-    let targetVelocityX = this.walkWaySpeed; // 기본 속도는 컨베이어 속도
-    if (isMovingLeft) {
-      targetVelocityX -= this.playerController.speed.run;
-    } else if (isMovingRight) {
-      targetVelocityX += this.playerController.speed.run;
-    }
-
-    // 3. 현재 속도에서 목표 속도로 'smoothedControls.value' 만큼 보간하여 최종 속도를 결정합니다.
+    // 속도 계산
     const currentVelocityX = this.player.body.velocity.x;
     let newVelocityX;
 
-    if (isMovingLeft || isMovingRight) {
-      // 키를 누르고 있을 때: '가속' 효과 적용
-      // smoothedControls.value가 0 -> 1로 변하면서 newVelocityX가 점진적으로 targetVelocityX에 가까워집니다.
-      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, Math.abs(this.smoothedControls.value));
+    if (isMovingLeft) {
+      const targetVelocityX = -this.playerController.speed.run + this.walkWaySpeed;
+      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, -this.smoothedControls.value);
+    } else if (isMovingRight) {
+      const targetVelocityX = this.playerController.speed.run + this.walkWaySpeed;
+      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, this.smoothedControls.value);
     } else {
-      // 키를 누르지 않았을 때: 부드럽게 감속하거나 컨베이어 속도에 맞춰짐
-      // 고정된 lerpFactor를 사용하여 현재 속도를 컨베이어 속도(targetVelocityX)로 점차 변경합니다.
-      const lerpFactor = 0.1;
-      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, lerpFactor);
+      // 키 입력 없음: 땅의 종류에 따라 감속 처리
+      if (this.isPlayerOnIce) {
+        // 얼음 위: 아주 천천히 감속하여 미끄러지는 효과 생성
+        const lerpFactor = 0.001;
+        newVelocityX = Phaser.Math.Linear(currentVelocityX, this.walkWaySpeed, lerpFactor);
+      } else {
+        // 일반 땅 위: 빠르게 감속하여 멈춤
+        const lerpFactor = 0.3;
+        newVelocityX = Phaser.Math.Linear(currentVelocityX, this.walkWaySpeed, lerpFactor);
+      }
     }
 
     this.player.setVelocityX(newVelocityX);
 
     // 4. 애니메이션 처리
     if (!this.isPlayerOnGround) {
-      if (this.playerStatus === 'left') {
-        this.player.anims.play('jump-left', true);
-      } else {
-        this.player.anims.play('jump-right', true);
-      }
+      if (this.playerStatus === 'left') this.player.anims.play('jump-left', true);
+      else this.player.anims.play('jump-right', true);
     } else {
       if (isMovingLeft) {
         this.player.anims.play('move-left', true);
@@ -662,10 +664,18 @@ export class Game extends Scene {
         this.player.anims.play('move-right', true);
         this.playerStatus = 'right';
       } else {
-        if (this.playerStatus === 'left') {
-          this.player.anims.play('idle-left', true);
+        if (Math.abs(this.player.body.velocity.x) > 0.1) {
+          if (this.playerStatus === 'left') {
+            this.player.anims.play('move-left', true);
+          } else {
+            this.player.anims.play('move-right', true);
+          }
         } else {
-          this.player.anims.play('idle-right', true);
+          if (this.playerStatus === 'left') {
+            this.player.anims.play('idle-left', true);
+          } else {
+            this.player.anims.play('idle-right', true);
+          }
         }
       }
     }
@@ -775,6 +785,25 @@ class SmoothedHorizontalControl {
       this.value = 1;
     }
     playerController.time.leftDown += delta;
+  }
+
+  dampen(delta: number) {
+    // 오른쪽으로 움직이던 중이었다면 (value > 0)
+    if (this.value > 0) {
+      this.value -= this.speed * delta;
+      // 감속 중에 0을 지나치지 않도록 보정
+      if (this.value < 0) {
+        this.value = 0;
+      }
+    }
+    // 왼쪽으로 움직이던 중이었다면 (value < 0)
+    else if (this.value < 0) {
+      this.value += this.speed * delta;
+      // 감속 중에 0을 지나치지 않도록 보정
+      if (this.value > 0) {
+        this.value = 0;
+      }
+    }
   }
 
   reset() {
