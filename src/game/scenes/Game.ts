@@ -309,9 +309,9 @@ export class Game extends Scene {
       const patrolRange = 50;
       const speed = 1;
 
-      const frameIndex = enemyObject.gid! - this.tileset.firstgid;
+      const frameIndex = 0;
       const enemySprite = this.matter.add
-        .sprite(enemyObject.x!, enemyObject.y!, 'tileset', frameIndex, {
+        .sprite(enemyObject.x!, enemyObject.y!, 'tileset2', frameIndex, {
           label: 'enemy',
           isStatic: false,
           friction: 0.001,
@@ -402,7 +402,7 @@ export class Game extends Scene {
   setupCamera() {
     this.camera = this.cameras.main;
     this.camera.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
-    this.camera.startFollow(this.player, true);
+    this.camera.startFollow(this.player, true, 0.1, 0.1);
   }
 
   /** 충돌 설정 */
