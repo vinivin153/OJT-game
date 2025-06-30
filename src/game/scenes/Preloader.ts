@@ -34,6 +34,11 @@ export class Preloader extends Scene {
       frameWidth: 80,
       frameHeight: 82,
     });
+
+    this.load.svg('gear', 'gear.svg', {
+      width: 64,
+      height: 64,
+    });
   }
 
   create() {

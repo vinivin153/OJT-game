@@ -23,6 +23,7 @@ export class Game extends Scene {
   create() {
     this.background = this.add.image(0, 0, 'world-bg').setOrigin(0, 0);
     this.createMap();
+    this.createOptionButton();
     this.createPlayer();
     this.setupCamera();
     this.setupCollisions();
@@ -181,6 +182,53 @@ export class Game extends Scene {
     this.createTrapObjects();
     this.createEnimies();
     this.createLiftObjects();
+  }
+
+  /** 옵션 버튼 생성 */
+  createOptionButton() {
+    const optionsButton = this.add
+      .image(this.cameras.main.width - 30, 30, 'gear')
+      .setScale(0.5)
+      .setInteractive({ useHandCursor: true });
+    optionsButton.setScrollFactor(0);
+
+    const labelBackground = this.add.graphics();
+    labelBackground.fillStyle(0x000000, 0.7);
+    labelBackground.fillRoundedRect(this.cameras.main.width - 50, 46, 40, 18, 8);
+    labelBackground.setScrollFactor(0);
+
+    const labelText = this.add.text(this.cameras.main.width - 30, 56, '옵션', {
+      fontSize: 12,
+      fontFamily: 'Arial Black',
+    });
+    labelText.setOrigin(0.5);
+    labelText.setScrollFactor(0);
+
+    optionsButton.on('pointerover', () => {
+      this.tweens.add({
+        targets: optionsButton,
+        scaleX: 0.55,
+        scaleY: 0.55,
+        duration: 150,
+        ease: 'Back.easeOut',
+      });
+    });
+
+    optionsButton.on('pointerout', () => {
+      this.tweens.add({
+        targets: optionsButton,
+        scaleX: 0.5,
+        scaleY: 0.5,
+        y: 30,
+        duration: 150,
+        ease: 'Back.easeOut',
+      });
+    });
+
+    optionsButton.on('pointerdown', () => {
+      this.scene.pause();
+      this.scene.launch('OptionsModal', { from: 'Game' });
+    });
   }
 
   /** ground object 생성 */
