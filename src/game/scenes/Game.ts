@@ -6,6 +6,7 @@ export class Game extends Scene {
   background: Phaser.GameObjects.Image;
   player: Phaser.Physics.Matter.Sprite;
   enemy: Phaser.Physics.Matter.Sprite | null;
+  exit: Phaser.Physics.Matter.Sprite | null;
   map: Phaser.Tilemaps.Tilemap;
   tileset: Phaser.Tilemaps.Tileset;
   playerController: playerControllerType;
@@ -141,7 +142,7 @@ export class Game extends Scene {
     this.player.setExistingBody(compoundBody);
     this.player.setFixedRotation();
     // this.player.setPosition(100, 800);
-    this.player.setPosition(2000, 400);
+    this.player.setPosition(1900, 400);
 
     // 플레이어 컨트롤러 초기화
     this.playerController = {
@@ -526,6 +527,8 @@ export class Game extends Scene {
       label: 'exit',
       isStatic: true,
     });
+
+    this.exit = exitSprite;
   }
 
   /** 카메라 설정 */
@@ -601,7 +604,8 @@ export class Game extends Scene {
           groundCandidate.label.startsWith('walkway_') ||
           groundCandidate.label === 'cloud' ||
           groundCandidate.label === 'lift' ||
-          groundCandidate.label === 'pipe';
+          groundCandidate.label === 'pipe' ||
+          groundCandidate.label === 'exit';
 
         // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
         const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
@@ -649,7 +653,6 @@ export class Game extends Scene {
               },
             });
           }
-          console.log(this.player.width, this.player.height, this.player.displayWidth, this.player.displayHeight);
 
           // 5. 만약 그 바닥이 컨베이어 벨트라면, 추가로 힘을 적용!
           if (groundCandidate.label.startsWith('walkway_')) {
@@ -720,6 +723,17 @@ export class Game extends Scene {
         // 플레이어가 트랩에 닿았을 때
         if (hasLabel(pair, 'trap', 'player')) {
           this.handleGameOver();
+        }
+
+        // 플레이어가 exit을 밟았을 때
+        if (hasLabel(pair, 'exit', 'bottomSensor')) {
+          this.sounds.clear.play();
+          this.exit!.setFrame(45);
+          this.player.setVelocity(0, 0);
+          this.cameras.main.fadeOut(300, 0, 0, 0);
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.scene.start('GameClear');
+          });
         }
 
         // 플레이어가 적과 충돌했을 때
@@ -891,7 +905,6 @@ export class Game extends Scene {
 
   /** 메시지 표시 */
   showMessage(message: string) {
-    console.log(message);
     const style = {
       fontFamily: 'Arial Black',
       fontSize: '24px',
