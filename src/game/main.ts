@@ -4,6 +4,8 @@ import { Game as MainGame } from './scenes/Game';
 import { MainMenu } from './scenes/MainMenu';
 import { AUTO, Game } from 'phaser';
 import { Preloader } from './scenes/Preloader';
+import { OptionsModal } from './scenes/OptionModal';
+import { Explanation } from './scenes/Explanation';
 
 const zoom = window.innerHeight / 360;
 const config: Phaser.Types.Core.GameConfig = {
@@ -12,7 +14,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 360,
   parent: 'game-container',
   backgroundColor: '#028af8',
-  scene: [Boot, Preloader, MainMenu, MainGame, GameOver],
+  scene: [Boot, Preloader, MainMenu, MainGame, GameOver, OptionsModal, Explanation],
   zoom,
   physics: {
     default: 'matter',
