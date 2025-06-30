@@ -16,6 +16,9 @@ export class Game extends Scene {
   walkWaySpeed = 0;
   isGameOver = false;
 
+  initialScaleX = 64 / 80; // 플레이어 스프라이트의 초기 너비 비율
+  initialScaleY = 48 / 64; // 플레이어 스프라이트의 초기 높이 비율
+
   private sounds: {
     jump: Phaser.Sound.BaseSound;
     die: Phaser.Sound.BaseSound;
@@ -133,7 +136,8 @@ export class Game extends Scene {
 
     // 플레이어 스프라이트 생성
     this.player = this.matter.add.sprite(100, 400, 'player');
-    this.player.setDisplaySize(64, 48);
+    this.player.setScale(this.initialScaleX, this.initialScaleY);
+
     this.player.setExistingBody(compoundBody);
     this.player.setFixedRotation();
     // this.player.setPosition(100, 800);
@@ -191,6 +195,8 @@ export class Game extends Scene {
     this.createTrapObjects();
     this.createEnimies();
     this.createLiftObjects();
+    this.createPipeLayer();
+    this.createExitObject();
   }
 
   /** 옵션 버튼 생성 */
@@ -480,6 +486,48 @@ export class Game extends Scene {
     }
   }
 
+  /** pipe layer 생성 */
+  createPipeLayer() {
+    const pipeLayer = this.map.createLayer('pipe', this.tileset, 0, 0);
+
+    if (!pipeLayer) {
+      console.error('pipe 레이어를 생성할 수 없습니다');
+      return;
+    }
+
+    // pipe Layer 충돌 설정
+    pipeLayer.setCollisionByExclusion([-1]);
+
+    // Matter.js 물리 바디로 변환
+    this.matter.world.convertTilemapLayer(pipeLayer, {
+      label: 'pipe',
+      friction: 0.001,
+      frictionAir: 0.001,
+      static: true,
+    });
+    pipeLayer.setDepth(5);
+  }
+
+  /** exit object 생성 */
+  createExitObject() {
+    const exitObject = this.map.getObjectLayer('exit')?.objects[0];
+
+    if (!exitObject) {
+      console.error('exit 오브젝트를 찾을 수 없습니다.');
+      return;
+    }
+
+    const frameIndex = exitObject.gid! - this.tileset.firstgid;
+
+    const x = exitObject.x! + exitObject.width! / 2;
+    const y = exitObject.y! - exitObject.height! / 2;
+
+    const exitSprite = this.matter.add.sprite(x, y, 'tileset', frameIndex, {
+      label: 'exit',
+      isStatic: true,
+    });
+  }
+
   /** 카메라 설정 */
   setupCamera() {
     this.camera = this.cameras.main;
@@ -552,7 +600,8 @@ export class Game extends Scene {
           groundCandidate.label === 'iceGround' ||
           groundCandidate.label.startsWith('walkway_') ||
           groundCandidate.label === 'cloud' ||
-          groundCandidate.label === 'lift';
+          groundCandidate.label === 'lift' ||
+          groundCandidate.label === 'pipe';
 
         // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
         const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
@@ -565,6 +614,42 @@ export class Game extends Scene {
           if (groundCandidate.label === 'iceGround') {
             this.isPlayerOnIce = true;
           }
+
+          // 바닥이 파이프이고 여기서 키보드 아래방향 키를 누르면, 플레이어를 파이프 안으로 이동
+          const downKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+          if (groundCandidate.label === 'pipe' && downKey?.isDown) {
+            this.sounds.pipe.play();
+
+            // 플레이어 입력 차단
+            this.player.setStatic(true);
+            this.player.setVelocity(0, 0);
+            this.tweens.add({
+              targets: this.player,
+              scale: 0.3,
+              duration: 300,
+              ease: 'Power2.easeOut',
+              onComplete: () => {
+                this.tweens.add({
+                  targets: this.player,
+                  y: this.player.y + 40,
+                  duration: 600,
+                  ease: 'Power2.easeIn',
+                  onComplete: () => {
+                    this.cameras.main.fadeOut(300, 0, 0, 0);
+
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                      this.player.setPosition(100, 800);
+                      this.player.setScale(this.initialScaleX, this.initialScaleY);
+                      this.player.setAlpha(1);
+                      this.player.setStatic(false);
+                      this.cameras.main.fadeIn(300, 0, 0, 0);
+                    });
+                  },
+                });
+              },
+            });
+          }
+          console.log(this.player.width, this.player.height, this.player.displayWidth, this.player.displayHeight);
 
           // 5. 만약 그 바닥이 컨베이어 벨트라면, 추가로 힘을 적용!
           if (groundCandidate.label.startsWith('walkway_')) {
