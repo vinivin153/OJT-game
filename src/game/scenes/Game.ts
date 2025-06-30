@@ -16,6 +16,14 @@ export class Game extends Scene {
   walkWaySpeed = 0;
   isGameOver = false;
 
+  private sounds: {
+    jump: Phaser.Sound.BaseSound;
+    die: Phaser.Sound.BaseSound;
+    stomp: Phaser.Sound.BaseSound;
+    clear: Phaser.Sound.BaseSound;
+    pipe: Phaser.Sound.BaseSound;
+  };
+
   constructor() {
     super('Game');
   }
@@ -28,6 +36,7 @@ export class Game extends Scene {
     this.setupCamera();
     this.setupCollisions();
     this.setupInput();
+    this.setupBGM();
   }
 
   /** 입력 설정 */
@@ -478,6 +487,24 @@ export class Game extends Scene {
     this.camera.startFollow(this.player, true, 0.1, 0.1);
   }
 
+  /** bgm 설정 */
+  setupBGM() {
+    const bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
+    this.sounds = {
+      jump: this.sound.add('jump', { volume: 0.5, rate: 1.5 }),
+      die: this.sound.add('die', { volume: 0.5, rate: 1.2 }),
+      stomp: this.sound.add('stomp', { volume: 0.5 }),
+      clear: this.sound.add('clear', { volume: 0.5 }),
+      pipe: this.sound.add('pipe', { volume: 0.5 }),
+    };
+
+    bgm.play();
+
+    this.events.on('shutdown', () => {
+      bgm.stop();
+    });
+  }
+
   /** 충돌 설정 */
   setupCollisions() {
     this.matter.world.on('beforeupdate', () => {
@@ -620,6 +647,7 @@ export class Game extends Scene {
           const enemyGameObject = enemyBody.gameObject as Phaser.Physics.Matter.Sprite;
           {
             if (enemyBody && pair.collision.normal.y > 0.5) {
+              this.sounds.stomp.play();
               this.player.setVelocityY(-this.playerController.speed.jump * 0.6);
               enemyGameObject.setStatic(true);
               enemyGameObject.setSensor(true);
@@ -730,6 +758,7 @@ export class Game extends Scene {
     // 5. 점프 로직
     const canJump = this.time.now - this.playerController.lastJumpedAt > 250;
     if (cursors.space.isDown && this.isPlayerOnGround && canJump) {
+      this.sounds.jump.play();
       this.player.setVelocityY(-this.playerController.speed.jump);
       this.playerController.lastJumpedAt = this.time.now;
     }
@@ -758,6 +787,7 @@ export class Game extends Scene {
   handleGameOver() {
     if (this.isGameOver) return;
 
+    this.sounds.die.play();
     this.isGameOver = true;
     this.registry.inc('attempts', 1);
     const deadTime = (this.time.now - this.registry.get('startTime')) / 1000;
