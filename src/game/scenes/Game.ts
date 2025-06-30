@@ -196,7 +196,7 @@ export class Game extends Scene {
     // Matter.js 물리 바디로 변환
     this.matter.world.convertTilemapLayer(groundLayer, {
       label: 'ground',
-      friction: 0.01,
+      friction: 0.1,
       frictionAir: 0.001,
       static: true,
     });
@@ -534,7 +534,6 @@ export class Game extends Scene {
         }
 
         if (hasLabel(pair, 'player', 'iceGround')) {
-          console.log('플레이어가 얼음 위에 있습니다');
           this.isPlayerOnIce = true;
         }
 
@@ -712,6 +711,8 @@ export class Game extends Scene {
     if (this.isGameOver) return;
 
     this.isGameOver = true;
+    this.registry.inc('attempts', 1);
+    const deadTime = (this.time.now - this.registry.get('startTime')) / 1000;
 
     // 게임 오버 로직 추가 (씬 재시작, 메뉴로 이동 등)
     this.camera.fade(1000, 0, 0, 0);
@@ -720,9 +721,7 @@ export class Game extends Scene {
     this.time.addEvent({
       delay: 1000,
       callback: () => {
-        this.camera.resetFX();
-        this.scene.stop();
-        this.scene.restart();
+        this.scene.start('GameOver', { deadTime });
       },
     });
   }
