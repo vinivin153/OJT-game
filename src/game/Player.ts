@@ -88,7 +88,7 @@ export class Player extends Phaser.Physics.Matter.Sprite {
   /** 플레이어의 compoundBody 생성 */
   private createCompoundBody(): MatterJS.BodyType {
     // 플레이어 바디 설정
-    const M = (Phaser.Physics.Matter as any).Matter;
+    const bodies = this.scene.matter.bodies;
     const width = 60;
     const height = 30;
 
@@ -96,31 +96,31 @@ export class Player extends Phaser.Physics.Matter.Sprite {
     const sy = height;
 
     // 플레이어 메인 바디
-    const playerBody = M.Bodies.rectangle(sx, sy, width * 0.6, height, {
+    const playerBody = bodies.rectangle(sx, sy, width * 0.6, height, {
       chamfer: { radius: 10 },
       label: 'player',
     });
 
     // 바닥 감지 센서
-    const bottomSensor = M.Bodies.rectangle(sx, sy + height / 2 + 2, width * 0.4, 6, {
+    const bottomSensor = bodies.rectangle(sx, sy + height / 2 + 2, width * 0.4, 6, {
       isSensor: true,
       label: 'bottomSensor',
     });
 
     // 왼쪽 센서
-    const leftSensor = M.Bodies.rectangle(sx - width / 2 + 8, sy, 6, height * 0.5, {
+    const leftSensor = bodies.rectangle(sx - width / 2 + 8, sy, 6, height * 0.5, {
       isSensor: true,
       label: 'leftSensor',
     });
 
     // 오른쪽 센서
-    const rightSensor = M.Bodies.rectangle(sx + width / 2 - 8, sy, 6, height * 0.5, {
+    const rightSensor = bodies.rectangle(sx + width / 2 - 8, sy, 6, height * 0.5, {
       isSensor: true,
       label: 'rightSensor',
     });
 
     // 복합 바디 생성
-    return M.Body.create({
+    return this.scene.matter.body.create({
       parts: [playerBody, bottomSensor, leftSensor, rightSensor],
       restitution: 0.05,
       friction: 0,
