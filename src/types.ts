@@ -11,9 +11,9 @@ export type playerControllerType = {
     bottom: number;
   };
   sensors: {
-    bottom: Phaser.Physics.Matter.Sprite | null;
-    left: Phaser.Physics.Matter.Sprite | null;
-    right: Phaser.Physics.Matter.Sprite | null;
+    bottom: MatterJS.BodyType;
+    left: MatterJS.BodyType;
+    right: MatterJS.BodyType;
   };
   time: {
     leftDown: number;
