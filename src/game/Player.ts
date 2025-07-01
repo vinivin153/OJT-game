@@ -19,9 +19,9 @@ export class Player extends Phaser.Physics.Matter.Sprite {
     pipe: Phaser.Sound.BaseSound;
   };
 
-  constructor(secene: Phaser.Scene, x: number, y: number) {
-    super(secene.matter.world, x, y, 'player', 0);
-    this.scene = secene;
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene.matter.world, x, y, 'player', 0);
+    this.scene = scene;
     this.createAnims();
     this.initSounds();
 
@@ -32,7 +32,7 @@ export class Player extends Phaser.Physics.Matter.Sprite {
     this.setPosition(x, y);
 
     this.controller = this.initcontroller(compoundBody);
-    this.smoothedControls = new SmoothedHorizontalControl(0.001);
+    this.smoothedControls = new SmoothedHorizontalControl(0.0004);
   }
 
   /** 플레이어와 관련된 애니메이션 설정 */
@@ -191,7 +191,6 @@ export class Player extends Phaser.Physics.Matter.Sprite {
     if (!this.body) {
       return;
     }
-
     const cursors = this.scene.input.keyboard!.createCursorKeys();
     const isMovingLeft = cursors.left.isDown;
     const isMovingRight = cursors.right.isDown;
