@@ -141,8 +141,7 @@ export class Game extends Scene {
 
     this.player.setExistingBody(compoundBody);
     this.player.setFixedRotation();
-    // this.player.setPosition(100, 800);
-    this.player.setPosition(1900, 400);
+    this.player.setPosition(100, 900);
 
     // 플레이어 컨트롤러 초기화
     this.playerController = {
@@ -198,6 +197,7 @@ export class Game extends Scene {
     this.createLiftObjects();
     this.createPipeLayer();
     this.createExitObject();
+    this.createJumpPadObject();
   }
 
   /** 옵션 버튼 생성 */
@@ -531,6 +531,38 @@ export class Game extends Scene {
     this.exit = exitSprite;
   }
 
+  /** 점프대 object 생성 */
+  createJumpPadObject() {
+    const jumpPadLayer = this.map.getObjectLayer('jump_pad');
+
+    if (!jumpPadLayer) {
+      console.error('jump_pad 오브젝트 레이어를 찾을 수 없습니다.');
+      return;
+    }
+
+    jumpPadLayer.objects.forEach((jumpPadObject) => {
+      if (!jumpPadObject.gid) return;
+
+      const x = jumpPadObject.x! + jumpPadObject.width! / 2;
+      const y = jumpPadObject.y! - jumpPadObject.height! / 2;
+
+      const frameIndex = jumpPadObject.gid - this.tileset.firstgid;
+
+      const jumpPad = this.matter.add
+        .sprite(x, y, 'tileset', frameIndex, {
+          label: 'jump_pad',
+          isStatic: true,
+        })
+        .setOrigin(0.5, 0.5);
+
+      if (jumpPadObject.properties) {
+        jumpPadObject.properties.forEach((prop: { name: string; value: any }) => {
+          jumpPad.setData(prop.name, prop.value);
+        });
+      }
+    });
+  }
+
   /** 카메라 설정 */
   setupCamera() {
     this.camera = this.cameras.main;
@@ -605,7 +637,8 @@ export class Game extends Scene {
           groundCandidate.label === 'cloud' ||
           groundCandidate.label === 'lift' ||
           groundCandidate.label === 'pipe' ||
-          groundCandidate.label === 'exit';
+          groundCandidate.label === 'exit' ||
+          groundCandidate.label === 'jump_pad';
 
         // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
         const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
@@ -723,6 +756,48 @@ export class Game extends Scene {
         // 플레이어가 트랩에 닿았을 때
         if (hasLabel(pair, 'trap', 'player')) {
           this.handleGameOver();
+        }
+
+        if (hasLabel(pair, 'jump_pad', 'bottomSensor')) {
+          this.sounds.jump.play();
+
+          const jumpPadBody = bodyA.label === 'jump_pad' ? bodyA : bodyB;
+          const jumpPadGameObject = jumpPadBody.gameObject as Phaser.Physics.Matter.Sprite;
+          const endPoint = new Phaser.Math.Vector2(
+            jumpPadGameObject.getData('posX') || this.player.x,
+            jumpPadGameObject.getData('posY') || this.player.y
+          );
+
+          this.player.setStatic(true);
+
+          const startPoint = new Phaser.Math.Vector2(this.player.x, this.player.y);
+
+          // 제어점: 시작점과 끝점의 중간 위쪽에 위치시켜 아치 모양을 만듦
+          const controlPoint = new Phaser.Math.Vector2(
+            startPoint.x + (endPoint.x - startPoint.x) / 2,
+            Math.min(startPoint.y, endPoint.y) - 200 // 곡선의 높이 조절
+          );
+
+          // 2차 베지어 곡선 생성
+          const curve = new Phaser.Curves.QuadraticBezier(startPoint, controlPoint, endPoint);
+
+          // 0에서 1까지 변하는 값을 가진 더미 객체를 트윈
+          const pathTween = { t: 0 };
+          this.tweens.add({
+            targets: pathTween,
+            t: 1,
+            duration: 1500,
+            ease: 'Linear',
+            onUpdate: () => {
+              // pathTween.t 값(0~1)에 따라 곡선 위의 좌표를 가져옴
+              const position = curve.getPoint(pathTween.t);
+              // 플레이어 위치를 해당 좌표로 계속 업데이트
+              this.player.setPosition(position.x, position.y);
+            },
+            onComplete: () => {
+              this.player.setStatic(false);
+            },
+          });
         }
 
         // 플레이어가 exit을 밟았을 때
