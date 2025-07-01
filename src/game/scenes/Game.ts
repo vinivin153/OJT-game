@@ -1,19 +1,15 @@
 import { Scene } from 'phaser';
-import { playerControllerType } from '../../types';
+import { Player } from '../Player';
 
 export class Game extends Scene {
+  player: Player;
+
   camera: Phaser.Cameras.Scene2D.Camera;
   background: Phaser.GameObjects.Image;
-  player: Phaser.Physics.Matter.Sprite;
   enemy: Phaser.Physics.Matter.Sprite | null;
   exit: Phaser.Physics.Matter.Sprite | null;
   map: Phaser.Tilemaps.Tilemap;
   tileset: Phaser.Tilemaps.Tileset;
-  playerController: playerControllerType;
-  isPlayerOnGround = false;
-  isPlayerOnIce = false;
-  playerStatus = 'idle';
-  smoothedControls: SmoothedHorizontalControl;
   walkWaySpeed = 0;
   isGameOver = false;
 
@@ -33,144 +29,16 @@ export class Game extends Scene {
   }
 
   create() {
+    this.isGameOver = false;
+
     this.background = this.add.image(0, 0, 'world-bg').setOrigin(0, 0);
     this.createMap();
     this.createOptionButton();
-    this.createPlayer();
+    this.player = new Player(this, 100, 900);
+    this.add.existing(this.player);
     this.setupCamera();
     this.setupCollisions();
-    this.setupInput();
     this.setupBGM();
-  }
-
-  /** 입력 설정 */
-  setupInput() {
-    this.smoothedControls = new SmoothedHorizontalControl(0.001);
-  }
-
-  /** 캐릭터 생성 */
-  createPlayer() {
-    this.isGameOver = false;
-
-    // 애니메이션 생성
-    this.anims.create({
-      key: 'move-right',
-      frames: this.anims.generateFrameNumbers('player', { start: 27, end: 34 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-
-    this.anims.create({
-      key: 'move-left',
-      frames: this.anims.generateFrameNumbers('player', { start: 72, end: 79 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-
-    this.anims.create({
-      key: 'idle-right',
-      frames: this.anims.generateFrameNumbers('player', { start: 0, end: 8 }),
-      frameRate: 9,
-      repeat: -1,
-    });
-
-    this.anims.create({
-      key: 'idle-left',
-      frames: this.anims.generateFrameNumbers('player', { start: 45, end: 53 }),
-      frameRate: 9,
-      repeat: -1,
-    });
-
-    this.anims.create({
-      key: 'jump-right',
-      frames: this.anims.generateFrameNumbers('player-jump', { start: 0, end: 5 }),
-      frameRate: 6,
-      repeat: -1,
-    });
-
-    this.anims.create({
-      key: 'jump-left',
-      frames: this.anims.generateFrameNumbers('player-jump', { start: 16, end: 31 }),
-      frameRate: 6,
-      repeat: -1,
-    });
-
-    // 플레이어 바디 설정
-    const M = (Phaser.Physics.Matter as any).Matter;
-    const w = 60;
-    const h = 30;
-
-    const sx = w / 2;
-    const sy = h;
-
-    // 플레이어 메인 바디
-    const playerBody = M.Bodies.rectangle(sx, sy, w * 0.6, h, {
-      chamfer: { radius: 10 },
-      label: 'player',
-    });
-
-    // 바닥 감지 센서 - 위치와 크기 조정
-    const bottomSensor = M.Bodies.rectangle(sx, sy + h / 2 + 2, w * 0.4, 6, {
-      isSensor: true,
-      label: 'bottomSensor',
-    });
-
-    // 왼쪽 센서 - 위치와 크기 조정
-    const leftSensor = M.Bodies.rectangle(sx - w / 2 + 8, sy, 6, h * 0.5, {
-      isSensor: true,
-      label: 'leftSensor',
-    });
-
-    // 오른쪽 센서 - 위치와 크기 조정
-    const rightSensor = M.Bodies.rectangle(sx + w / 2 - 8, sy, 6, h * 0.5, {
-      isSensor: true,
-      label: 'rightSensor',
-    });
-
-    // 복합 바디 생성
-    const compoundBody = M.Body.create({
-      parts: [playerBody, bottomSensor, leftSensor, rightSensor],
-      restitution: 0.05,
-      friction: 0,
-      frictionAir: 0,
-    });
-
-    // 플레이어 스프라이트 생성
-    this.player = this.matter.add.sprite(100, 400, 'player');
-    this.player.setScale(this.initialScaleX, this.initialScaleY);
-
-    this.player.setExistingBody(compoundBody);
-    this.player.setFixedRotation();
-    this.player.setPosition(100, 900);
-
-    // 플레이어 컨트롤러 초기화
-    this.playerController = {
-      matterSprite: this.player,
-      blocked: {
-        left: false,
-        right: false,
-        bottom: false,
-      },
-      numTouching: {
-        left: 0,
-        right: 0,
-        bottom: 0,
-      },
-      sensors: {
-        bottom: bottomSensor,
-        left: leftSensor,
-        right: rightSensor,
-      },
-      time: {
-        leftDown: 0,
-        rightDown: 0,
-      },
-      lastJumpedAt: 0,
-      speed: {
-        run: 3,
-        jump: 5,
-      },
-    };
   }
 
   /** 맵 생성 */
@@ -591,11 +459,11 @@ export class Game extends Scene {
   /** 충돌 설정 */
   setupCollisions() {
     this.matter.world.on('beforeupdate', () => {
-      this.playerController.numTouching.bottom = 0;
-      this.playerController.numTouching.left = 0;
-      this.playerController.numTouching.right = 0;
+      this.player.controller.numTouching.bottom = 0;
+      this.player.controller.numTouching.left = 0;
+      this.player.controller.numTouching.right = 0;
+      this.player.isPlayerOnIce = false;
       this.walkWaySpeed = 0;
-      this.isPlayerOnIce = false;
     });
 
     this.matter.world.on('collisionactive', (event: Phaser.Physics.Matter.Events.CollisionActiveEvent) => {
@@ -606,15 +474,15 @@ export class Game extends Scene {
 
         const isStaticBody = (body: MatterJS.BodyType) => !body.isSensor && body.isStatic;
         if (bodyA.label === 'leftSensor' && isStaticBody(bodyB)) {
-          this.playerController.numTouching.left += 1;
+          this.player.controller.numTouching.left += 1;
         } else if (bodyB.label === 'leftSensor' && isStaticBody(bodyA)) {
-          this.playerController.numTouching.left += 1;
+          this.player.controller.numTouching.left += 1;
         }
 
         if (bodyA.label === 'rightSensor' && isStaticBody(bodyB)) {
-          this.playerController.numTouching.right += 1;
+          this.player.controller.numTouching.right += 1;
         } else if (bodyB.label === 'rightSensor' && isStaticBody(bodyA)) {
-          this.playerController.numTouching.right += 1;
+          this.player.controller.numTouching.right += 1;
         }
 
         // --- 바닥 감지 및 컨베이어 벨트 로직 통합 ---
@@ -630,26 +498,20 @@ export class Game extends Scene {
         }
 
         // 2. 상대방이 바닥 역할을 하는 표면인지 확인
+        const groundLabels = ['ground', 'iceGround', 'cloud', 'lift', 'pipe', 'exit', 'jump_pad'];
         const isGroundSurface =
-          groundCandidate.label === 'ground' ||
-          groundCandidate.label === 'iceGround' ||
-          groundCandidate.label.startsWith('walkway_') ||
-          groundCandidate.label === 'cloud' ||
-          groundCandidate.label === 'lift' ||
-          groundCandidate.label === 'pipe' ||
-          groundCandidate.label === 'exit' ||
-          groundCandidate.label === 'jump_pad';
+          groundLabels.includes(groundCandidate.label) || groundCandidate.label.startsWith('walkway_');
 
         // 3. 충돌 방향이 수직인지 확인 (옆면 충돌 방지)
         const isVerticalCollision = Math.abs(pair.collision.normal.y) > 0.9;
 
         if (isGroundSurface && isVerticalCollision) {
           // 4. 바닥에 닿았으므로 카운터를 증가시킴
-          this.playerController.numTouching.bottom += 1;
+          this.player.controller.numTouching.bottom += 1;
 
           // 바닥이 얼음이라면, isPlayerOnIce 플래그를 true로 설정
           if (groundCandidate.label === 'iceGround') {
-            this.isPlayerOnIce = true;
+            this.player.isPlayerOnIce = true;
           }
 
           // 바닥이 파이프이고 여기서 키보드 아래방향 키를 누르면, 플레이어를 파이프 안으로 이동
@@ -702,9 +564,10 @@ export class Game extends Scene {
 
     // 3. 모든 물리 및 이벤트 처리가 끝난 후, 최종 상태를 결정합니다.
     this.matter.world.on('afterupdate', () => {
-      this.isPlayerOnGround = this.playerController.numTouching.bottom > 0;
+      this.player.isPlayerOnGround = this.player.controller.numTouching.bottom > 0;
 
       // 게임 오버 조건
+      console.log('Player Y Position:', this.player.y);
       if (this.player.y > this.map.heightInPixels + 100) {
         this.handleGameOver();
       }
@@ -730,7 +593,7 @@ export class Game extends Scene {
         }
 
         if (hasLabel(pair, 'player', 'iceGround')) {
-          this.isPlayerOnIce = true;
+          this.player.isPlayerOnIce = true;
         }
 
         // 플레이어가 구름을 밟았을 때
@@ -822,7 +685,7 @@ export class Game extends Scene {
           {
             if (enemyBody && pair.collision.normal.y > 0.5) {
               this.sounds.stomp.play();
-              this.player.setVelocityY(-this.playerController.speed.jump * 0.6);
+              this.player.setVelocityY(-this.player.controller.speed.jump * 0.6);
               enemyGameObject.setStatic(true);
               enemyGameObject.setSensor(true);
               enemyGameObject.anims.stop();
@@ -850,92 +713,6 @@ export class Game extends Scene {
     layer!.removeTileAt(tile.x, tile.y);
     const physics = tile.physics as { matterBody?: Phaser.Physics.Matter.TileBody };
     physics.matterBody?.destroy();
-  }
-
-  /** 플레이어 이동 처리 */
-  handlePlayerMovement() {
-    if (this.isGameOver || !this.player || !this.player.body) {
-      this.player.setVelocity(0, 0);
-      return;
-    }
-
-    const cursors = this.input.keyboard!.createCursorKeys();
-    const isMovingLeft = cursors.left.isDown;
-    const isMovingRight = cursors.right.isDown;
-    const delta = this.game.loop.delta;
-
-    // 가속 처리
-    if (isMovingLeft) {
-      this.smoothedControls.moveLeft(delta, this.playerController);
-    } else if (isMovingRight) {
-      this.smoothedControls.moveRight(delta, this.playerController);
-    } else {
-      // 얼음 위가 아닐 때만 가속값을 리셋
-      if (!this.isPlayerOnIce) {
-        this.smoothedControls.reset();
-      }
-    }
-
-    // 속도 계산
-    const currentVelocityX = this.player.body.velocity.x;
-    let newVelocityX;
-
-    if (isMovingLeft) {
-      const targetVelocityX = -this.playerController.speed.run + this.walkWaySpeed;
-      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, -this.smoothedControls.value);
-    } else if (isMovingRight) {
-      const targetVelocityX = this.playerController.speed.run + this.walkWaySpeed;
-      newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, this.smoothedControls.value);
-    } else {
-      // 키 입력 없음: 땅의 종류에 따라 감속 처리
-      if (this.isPlayerOnIce) {
-        // 얼음 위: 아주 천천히 감속하여 미끄러지는 효과 생성
-        const lerpFactor = 0.001;
-        newVelocityX = Phaser.Math.Linear(currentVelocityX, this.walkWaySpeed, lerpFactor);
-      } else {
-        // 일반 땅 위: 빠르게 감속하여 멈춤
-        const lerpFactor = 0.3;
-        newVelocityX = Phaser.Math.Linear(currentVelocityX, this.walkWaySpeed, lerpFactor);
-      }
-    }
-
-    this.player.setVelocityX(newVelocityX);
-
-    // 4. 애니메이션 처리
-    if (!this.isPlayerOnGround) {
-      if (this.playerStatus === 'left') this.player.anims.play('jump-left', true);
-      else this.player.anims.play('jump-right', true);
-    } else {
-      if (isMovingLeft) {
-        this.player.anims.play('move-left', true);
-        this.playerStatus = 'left';
-      } else if (isMovingRight) {
-        this.player.anims.play('move-right', true);
-        this.playerStatus = 'right';
-      } else {
-        if (Math.abs(this.player.body.velocity.x) > 0.1) {
-          if (this.playerStatus === 'left') {
-            this.player.anims.play('move-left', true);
-          } else {
-            this.player.anims.play('move-right', true);
-          }
-        } else {
-          if (this.playerStatus === 'left') {
-            this.player.anims.play('idle-left', true);
-          } else {
-            this.player.anims.play('idle-right', true);
-          }
-        }
-      }
-    }
-
-    // 5. 점프 로직
-    const canJump = this.time.now - this.playerController.lastJumpedAt > 250;
-    if (cursors.space.isDown && this.isPlayerOnGround && canJump) {
-      this.sounds.jump.play();
-      this.player.setVelocityY(-this.playerController.speed.jump);
-      this.playerController.lastJumpedAt = this.time.now;
-    }
   }
 
   /** 적 이동 처리 */
@@ -1001,62 +778,15 @@ export class Game extends Scene {
   }
 
   update() {
-    this.handlePlayerMovement();
+    if (this.isGameOver) {
+      if (this.player.body) {
+        this.player.setVelocity(0, 0);
+      }
+      return;
+    }
+
+    this.player.movementUpdate(this.walkWaySpeed);
+    console.log(this.player.controller.numTouching);
     this.handleEnemyMovement();
-  }
-}
-
-class SmoothedHorizontalControl {
-  speed: number;
-  value: number;
-
-  constructor(speed: number) {
-    this.speed = speed;
-    this.value = 0;
-  }
-
-  moveLeft(delta: number, playerController: playerControllerType) {
-    if (this.value > 0) {
-      this.reset();
-    }
-    this.value -= this.speed * delta;
-    if (this.value < -1) {
-      this.value = -1;
-    }
-    playerController.time.rightDown += delta;
-  }
-
-  moveRight(delta: number, playerController: playerControllerType) {
-    if (this.value < 0) {
-      this.reset();
-    }
-    this.value += this.speed * delta;
-    if (this.value > 1) {
-      this.value = 1;
-    }
-    playerController.time.leftDown += delta;
-  }
-
-  dampen(delta: number) {
-    // 오른쪽으로 움직이던 중이었다면 (value > 0)
-    if (this.value > 0) {
-      this.value -= this.speed * delta;
-      // 감속 중에 0을 지나치지 않도록 보정
-      if (this.value < 0) {
-        this.value = 0;
-      }
-    }
-    // 왼쪽으로 움직이던 중이었다면 (value < 0)
-    else if (this.value < 0) {
-      this.value += this.speed * delta;
-      // 감속 중에 0을 지나치지 않도록 보정
-      if (this.value > 0) {
-        this.value = 0;
-      }
-    }
-  }
-
-  reset() {
-    this.value = 0;
   }
 }
