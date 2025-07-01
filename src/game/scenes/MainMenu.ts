@@ -15,9 +15,9 @@ export class MainMenu extends Scene {
     bg.setScale(scale);
 
     /**========== 배너 로고 ========== */
-    this.add.rectangle(240, 180, 180, 100, 0xde5819);
+    this.add.rectangle(240, 120, 180, 100, 0xde5819);
     this.add
-      .text(240, 180, '슈퍼\n말이오.', {
+      .text(240, 120, '슈퍼\n말이오.', {
         fontFamily: 'Arial Black',
         fontSize: '36px',
         color: '#fbe3b3',
@@ -58,13 +58,16 @@ export class MainMenu extends Scene {
       .setOrigin(0.5);
 
     // 버튼 컨테이너 생성
-    const startButton = this.add.container(240, 360, [startButtonBox, startButtonText]);
+    const startButton = this.add.container(width / 2, height - 80, [startButtonBox, startButtonText]);
     startButton.setSize(160, 50);
 
     // 버튼 마우스 이벤트 설정
     startButton
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => {
+        // 게임 시작 시간과 시도횟수 초기화
+        this.registry.set('startTime', this.time.now);
+        this.registry.set('attempts', 1);
         this.scene.start('Game');
       })
       .on('pointerover', () => {
@@ -73,8 +76,5 @@ export class MainMenu extends Scene {
       .on('pointerout', () => {
         setStartButtonBoxStyle(startButtonBox, 0);
       });
-
-    // 임시
-    this.scene.start('Game');
   }
 }
