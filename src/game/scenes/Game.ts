@@ -670,7 +670,8 @@ export class Game extends Scene {
           this.player.setVelocity(0, 0);
           this.cameras.main.fadeOut(300, 0, 0, 0);
           this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.scene.start('GameClear');
+            const clearTime = (this.time.now - this.registry.get('startTime')) / 1000;
+            this.scene.start('GameClear', { clearTime });
           });
         }
 
