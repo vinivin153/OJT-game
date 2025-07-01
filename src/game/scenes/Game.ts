@@ -424,7 +424,7 @@ export class Game extends Scene {
         .setOrigin(0.5, 0.5);
 
       if (jumpPadObject.properties) {
-        jumpPadObject.properties.forEach((prop: { name: string; value: any }) => {
+        jumpPadObject.properties.forEach((prop: { name: string; value: string }) => {
           jumpPad.setData(prop.name, prop.value);
         });
       }
