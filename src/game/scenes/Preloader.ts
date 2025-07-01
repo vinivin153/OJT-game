@@ -39,6 +39,12 @@ export class Preloader extends Scene {
       width: 64,
       height: 64,
     });
+    this.load.audio('bgm', 'bgm.mp3');
+    this.load.audio('jump', 'jump.mp3');
+    this.load.audio('die', 'die.wav');
+    this.load.audio('stomp', 'stomp.wav');
+    this.load.audio('clear', 'clear.wav');
+    this.load.audio('pipe', 'pipe.wav');
   }
 
   create() {
