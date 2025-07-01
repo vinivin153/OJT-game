@@ -39,7 +39,7 @@ export class GameClear extends Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(centerX, centerY + 30, `TIME - ${time}`, {
+      .text(centerX, centerY + 30, `TIME ${time}s`, {
         fontFamily: '"Press Start 2P"',
         align: 'center',
       })
