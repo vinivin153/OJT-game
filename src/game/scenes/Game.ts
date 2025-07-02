@@ -349,8 +349,8 @@ export class Game extends Scene {
   /** fake layer 생성 */
   createFakeLayer() {
     const fakeLayer = this.map.createLayer('fake', this.tileset, 0, 0);
-
-    if (!fakeLayer) {
+    const fakeCoinLayer = this.map.createLayer('fake_coin', this.tileset, 0, 0);
+    if (!fakeLayer || !fakeCoinLayer) {
       console.error('fake 레이어를 생성할 수 없습니다');
       return;
     }
@@ -372,6 +372,41 @@ export class Game extends Scene {
         }
       }
     }
+
+    // 각 fake_coin 타일에 대해 센서 바디 수동 생성
+    for (let y = 0; y < fakeCoinLayer.layer.height; y++) {
+      for (let x = 0; x < fakeCoinLayer.layer.width; x++) {
+        const tile = fakeCoinLayer.getTileAt(x, y);
+        if (tile && tile.index !== -1) {
+          const worldX = tile.getCenterX();
+          const worldY = tile.getCenterY();
+
+          // 센서 바디 생성 (물리적 충돌 없음, 감지만)
+          this.matter.add.rectangle(worldX, worldY, 24, 24, {
+            isStatic: true,
+            isSensor: true,
+            label: 'fake_coin',
+          });
+        }
+      }
+    }
+
+    this.anims.create({
+      key: 'coin',
+      frames: this.anims.generateFrameNumbers('tileset', { start: 21, end: 24 }),
+      frameRate: 8,
+      repeat: -1,
+      repeatDelay: 1000,
+    });
+
+    fakeCoinLayer.forEachTile((tile) => {
+      if (tile.index === 21 + this.tileset.firstgid) {
+        const animatedSprite = this.add.sprite(tile.pixelX, tile.pixelY, 'tileset').setOrigin(0, 0);
+        animatedSprite.play('coin');
+        // 기존 정적 타일 제거
+        fakeCoinLayer.removeTileAt(tile.x, tile.y);
+      }
+    });
   }
 
   /** pipe layer 생성 */
