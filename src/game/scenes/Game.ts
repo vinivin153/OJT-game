@@ -34,7 +34,7 @@ export class Game extends Scene {
     this.background = this.add.image(0, 0, 'world-bg').setOrigin(0, 0);
     this.createMap();
     this.createOptionButton();
-    this.player = new Player(this, 100, 900);
+    this.player = new Player(this, 500, 400);
     this.add.existing(this.player);
     this.setupCamera();
     this.setupCollisions();
@@ -155,6 +155,25 @@ export class Game extends Scene {
       friction: 0,
       frictionAir: 0,
       static: true,
+    });
+
+    this.anims.create({
+      key: 'iceGround',
+      frames: this.anims.generateFrameNumbers('tileset', { start: 105, end: 108 }),
+      frameRate: 8,
+      repeat: -1,
+      repeatDelay: 1000,
+    });
+
+    const tileGidToAnimate = 105 + this.tileset.firstgid;
+
+    iceGroundLayer.forEachTile((tile) => {
+      if (tile.index === tileGidToAnimate) {
+        const animatedSprite = this.add.sprite(tile.pixelX, tile.pixelY, 'tileset').setOrigin(0, 0);
+        animatedSprite.play('iceGround');
+        // 기존 정적 타일 제거
+        iceGroundLayer.removeTileAt(tile.x, tile.y);
+      }
     });
   }
 
@@ -567,7 +586,6 @@ export class Game extends Scene {
       this.player.isPlayerOnGround = this.player.controller.numTouching.bottom > 0;
 
       // 게임 오버 조건
-      console.log('Player Y Position:', this.player.y);
       if (this.player.y > this.map.heightInPixels + 100) {
         this.handleGameOver();
       }
@@ -787,7 +805,6 @@ export class Game extends Scene {
     }
 
     this.player.movementUpdate(this.walkWaySpeed);
-    console.log(this.player.controller.numTouching);
     this.handleEnemyMovement();
   }
 }
