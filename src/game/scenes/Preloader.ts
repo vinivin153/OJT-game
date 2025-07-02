@@ -45,6 +45,8 @@ export class Preloader extends Scene {
     this.load.audio('stomp', 'stomp.wav');
     this.load.audio('clear', 'clear.wav');
     this.load.audio('pipe', 'pipe.wav');
+    this.load.audio('pause', 'pause.wav');
+    this.load.audio('superJump', 'superjump.wav');
   }
 
   create() {

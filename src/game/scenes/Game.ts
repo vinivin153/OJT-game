@@ -22,6 +22,8 @@ export class Game extends Scene {
     stomp: Phaser.Sound.BaseSound;
     clear: Phaser.Sound.BaseSound;
     pipe: Phaser.Sound.BaseSound;
+    superJump: Phaser.Sound.BaseSound;
+    pause: Phaser.Sound.BaseSound;
   };
 
   constructor() {
@@ -96,6 +98,7 @@ export class Game extends Scene {
         duration: 150,
         ease: 'Back.easeOut',
       });
+      this.sounds.pause.play();
     });
 
     optionsButton.on('pointerout', () => {
@@ -501,6 +504,8 @@ export class Game extends Scene {
       stomp: this.sound.add('stomp', { volume: 0.5 }),
       clear: this.sound.add('clear', { volume: 0.5 }),
       pipe: this.sound.add('pipe', { volume: 0.5 }),
+      superJump: this.sound.add('superJump', { volume: 0.5 }),
+      pause: this.sound.add('pause', { volume: 0.5 }),
     };
 
     bgm.play();
@@ -675,7 +680,7 @@ export class Game extends Scene {
         }
 
         if (hasLabel(pair, 'jump_pad', 'bottomSensor')) {
-          this.sounds.jump.play();
+          this.sounds.superJump.play();
 
           const jumpPadBody = bodyA.label === 'jump_pad' ? bodyA : bodyB;
           const jumpPadGameObject = jumpPadBody.gameObject as Phaser.Physics.Matter.Sprite;
